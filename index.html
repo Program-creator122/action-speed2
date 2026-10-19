@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Two Player Game</title>
+<style>
+body {
+  margin: 0;
+  background: linear-gradient(to bottom, #cce7f0, #fdf6e3); /* soft sky to warm sand */
+  overflow: hidden;
+  font-family: "Segoe UI", sans-serif;
+}
+
+canvas {
+  display: block;
+}
+
+#hud {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(255, 255, 255, 0.6); /* translucent white */
+  padding: 12px 16px;
+  border-radius: 12px;
+  color: #2c3e50; /* calm dark gray */
+  font-size: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+#hud h3 {
+  margin: 0 0 8px 0;
+  font-weight: 500;
+  color: #3b5998; /* soft blue accent */
+}
+
+#status {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(255, 255, 255, 0.6);
+  padding: 12px 16px;
+  border-radius: 12px;
+  color: #2c3e50;
+  font-size: 14px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud">
+  <h3>🎮 Two Player Game</h3>
+  <p>Player1 Score: <span id="score1">0</span></p>
+  <p>Player2 Score: <span id="score2">0</span></p>
+</div>
+<div id="status">❌ No Controller</div>
+
+<script>
+/* =========================
+   SETUP
+========================= */
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+function resize(){ canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+resize(); window.addEventListener("resize", resize);
+
+/* =========================
+   PLAYERS
+========================= */
+const player1 = { x:100, y:200, size:40, speed:30, color:"#22c55e" }; // keyboard
+const player2 = { x:400, y:200, size:90, speed:80, color:"#3b82f6" }; // gamepad
+
+/* =========================
+   COLLECTIBLES
+========================= */
+const items = [];
+for(let i=0;i<50;i++){
+  items.push({ x:Math.random()*window.innerWidth, y:Math.random()*window.innerHeight, size:20 });
+}
+
+/* =========================
+   SCORES
+========================= */
+let score1=0, score2=0;
+document.getElementById("score1").innerText = score1;
+document.getElementById("score2").innerText = score2;
+
+/* =========================
+   KEYBOARD
+========================= */
+const keys={};
+window.addEventListener("keydown", e => keys[e.key]=true);
+window.addEventListener("keyup", e => keys[e.key]=false);
+
+/* =========================
+   GAMEPAD STATUS
+========================= */
+let controllerConnected=false;
+window.addEventListener("gamepadconnected", () => {
+  controllerConnected=true;
+  document.getElementById("status").innerText="✅ Controller Connected";
+});
+window.addEventListener("gamepaddisconnected", () => {
+  controllerConnected=false;
+  document.getElementById("status").innerText="❌ No Controller";
+});
+
+/* =========================
+   INPUT SYSTEM
+========================= */
+function getKeyboardInput(){
+  let x=0,y=0;
+  if(keys["ArrowUp"]) y=-1;
+  if(keys["ArrowDown"]) y=1;
+  if(keys["ArrowLeft"]) x=-1;
+  if(keys["ArrowRight"]) x=1;
+  return {x,y};
+}
+function getGamepadInput(){
+  let x=0,y=0;
+  const pads=navigator.getGamepads();
+  const gp=pads[0];
+  if(gp){
+    const deadzone=0.2;
+    if(Math.abs(gp.axes[0])>deadzone) x=gp.axes[0];
+    if(Math.abs(gp.axes[1])>deadzone) y=gp.axes[1];
+  }
+  return {x,y};
+}
+
+/* =========================
+   COLLISION
+========================= */
+function collide(player,item){
+  return (
+    player.x < item.x+item.size &&
+    player.x+player.size > item.x &&
+    player.y < item.y+item.size &&
+    player.y+player.size > item.y
+  );
+}
+
+/* =========================
+   UPDATE
+========================= */
+function update(){
+  // Adjust speed based on score
+  player1.speed = 7 + score1 / 100;
+  player2.speed = 7 + score2 / 100;
+
+  // Player1 (keyboard)
+  const k = getKeyboardInput();
+  player1.x += k.x * player1.speed;
+  player1.y += k.y * player1.speed;
+
+  // Player2 (gamepad)
+  const g = getGamepadInput();
+  player2.x += g.x * player2.speed;
+  player2.y += g.y * player2.speed;
+
+  // Boundaries
+  [player1, player2].forEach(p => {
+    p.x = Math.max(0, Math.min(canvas.width - p.size, p.x));
+    p.y = Math.max(0, Math.min(canvas.height - p.size, p.y));
+  });
+
+  // Collect items
+  for(let i=0; i<items.length; i++){
+    if(collide(player1, items[i])){
+      score1 += 10;
+      document.getElementById("score1").innerText = score1;
+      items[i].x = Math.random() * canvas.width;
+      items[i].y = Math.random() * canvas.height;
+    }
+    if(collide(player2, items[i])){
+      score2 += 10;
+      document.getElementById("score2").innerText = score2;
+      items[i].x = Math.random() * canvas.width;
+      items[i].y = Math.random() * canvas.height;
+    }
+  }
+}
+
+/* =========================
+   DRAW
+========================= */
+function drawBackground(){
+  const gradient=ctx.createLinearGradient(0,0,0,canvas.height);
+  gradient.addColorStop(0,"#0f172a");
+  gradient.addColorStop(1,"#8a1e1e");
+  ctx.fillStyle=gradient;
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+}
+function draw(){
+  drawBackground();
+  // Players
+  ctx.fillStyle=player1.color;
+  ctx.fillRect(player1.x,player1.y,player1.size,player1.size);
+  ctx.fillStyle=player2.color;
+  ctx.fillRect(player2.x,player2.y,player2.size,player2.size);
+  // Items
+  ctx.fillStyle="#facc15";
+  items.forEach(it=>{
+    ctx.beginPath();
+    ctx.arc(it.x,it.y,it.size,0,Math.PI*2);
+    ctx.fill();
+  });
+}
+
+/* =========================
+   GAME LOOP
+========================= */
+function loop(){ update(); draw(); requestAnimationFrame(loop); }
+loop();
+</script>
+</body>
+</html>
+
+
+
+player1.color = "#6ab187"; // soft green
+player2.color = "#7aa5d2"; // soft blue
+ctx.fillStyle = "#f4d35e"; // pastel yellow for items
